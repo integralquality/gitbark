@@ -82,6 +82,19 @@ a:hover {
   margin-bottom: 3rem;
 }
 
+.logo-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.logo-icon {
+  width: 32px;
+  height: 32px;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
 .logo {
   font-family: var(--font-mono);
   font-size: 1.6rem;
@@ -101,6 +114,24 @@ a:hover {
   margin-top: 0.35rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.description {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  line-height: 1.7;
+  margin-top: 1rem;
+  max-width: 520px;
+}
+
+.description code {
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  background: var(--bg-elevated);
+  padding: 0.1rem 0.4rem;
+  border-radius: 2px;
+  color: var(--accent);
+  border: 1px solid var(--border);
 }
 
 /* ============ FORM ============ */
