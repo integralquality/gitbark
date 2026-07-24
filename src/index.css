@@ -34,6 +34,9 @@
   --exposed: #e5484d;
   --exposed-soft: #fcecec;
 
+  --med: #c98a2e;
+  --med-soft: #f7eed9;
+
   --safe: #2f9e63;
   --safe-soft: #e6f5ec;
 
@@ -489,6 +492,110 @@ a:hover {
   color: var(--ink-3);
 }
 
+/* ============ OPTIONS DRAWER ============ */
+
+.form-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 0.6rem;
+}
+
+.options-toggle {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--ink-3);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  letter-spacing: 0.02em;
+  padding: 0.1rem 0.2rem;
+  transition: color 0.15s;
+}
+.options-toggle:hover {
+  color: var(--accent);
+}
+
+.options-panel {
+  margin-top: 0.75rem;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 1rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  box-shadow: var(--shadow-sm);
+  animation: fadeIn 0.2s ease;
+}
+
+.opt-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.opt-label {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.opt-field input {
+  background: var(--card-2);
+  border: 1.5px solid var(--line);
+  border-radius: 7px;
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  padding: 0.55rem 0.7rem;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.opt-field input:focus {
+  border-color: var(--accent);
+}
+
+.opt-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  cursor: pointer;
+  font-size: 0.82rem;
+  color: var(--ink-2);
+  line-height: 1.45;
+}
+.opt-check input {
+  margin-top: 0.15rem;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.opt-check strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+.opt-note {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  color: var(--ink-3);
+  margin-top: 0.15rem;
+}
+.opt-note code {
+  font-family: var(--font-mono);
+  color: var(--ink-2);
+  background: var(--card-2);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0.02rem 0.28rem;
+}
+
 /* ============ SCAN PROGRESS ============ */
 
 .scan-progress {
@@ -634,7 +741,7 @@ a:hover {
   margin-top: 0.35rem;
 }
 
-/* ============ EMAIL CARDS ============ */
+/* ============ PEOPLE / IDENTITY CARDS ============ */
 
 .section-label {
   font-family: var(--font-mono);
@@ -645,69 +752,139 @@ a:hover {
   margin-bottom: 0.6rem;
 }
 
-.email-list {
+.person-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 9px;
   margin-bottom: 1.75rem;
 }
 
-.email-card {
+.person-card {
   background: var(--card);
   border: 1px solid var(--line);
-  border-left: 3px solid var(--exposed);
-  padding: 0.8rem 1rem;
+  border-left: 3px solid var(--line);
+  padding: 0.85rem 1rem;
   border-radius: var(--radius-sm);
   box-shadow: var(--shadow-sm);
   animation: slideIn 0.35s ease both;
 }
-
-.email-card.noreply {
+.person-card.sev-high {
+  border-left-color: var(--exposed);
+}
+.person-card.sev-medium {
+  border-left-color: var(--med);
+}
+.person-card.sev-safe {
   border-left-color: var(--safe);
 }
 
-.email-row {
+.person-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.8rem;
-  margin-bottom: 0.4rem;
+  gap: 0.7rem;
+}
+
+.avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  object-fit: cover;
+  border: 1px solid var(--line);
+  background: var(--card-2);
+}
+.avatar-fallback {
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1rem;
+  color: var(--accent-600);
+  background: var(--accent-soft);
+  border-color: transparent;
+}
+
+.person-id {
+  flex: 1;
+  min-width: 0;
+}
+
+.person-name-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.15rem;
+}
+
+.person-name {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.you-badge {
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--accent-600);
+  background: var(--accent-soft);
+  padding: 0.12rem 0.4rem;
+  border-radius: 999px;
+}
+
+.sev-badge {
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 0.16rem 0.5rem;
+  border-radius: 999px;
+  margin-left: auto;
+}
+.sev-badge.sev-high {
+  color: var(--exposed);
+  background: var(--exposed-soft);
+}
+.sev-badge.sev-medium {
+  color: var(--med);
+  background: var(--med-soft);
+}
+.sev-badge.sev-safe {
+  color: var(--safe);
+  background: var(--safe-soft);
+}
+
+.person-email {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .email-address {
   font-family: var(--font-mono);
-  font-size: 0.87rem;
-  color: var(--ink);
+  font-size: 0.82rem;
+  color: var(--ink-2);
   word-break: break-all;
 }
 
-.email-meta {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.68rem;
-  color: var(--ink-3);
-  font-family: var(--font-mono);
-}
-
-.dot-sep {
-  opacity: 0.5;
-}
-
 .email-actions {
-  margin-left: auto;
   display: flex;
   gap: 0.35rem;
 }
 
 .mini-btn {
   font-family: var(--font-mono);
-  font-size: 0.64rem;
+  font-size: 0.62rem;
   color: var(--ink-2);
   background: var(--card-2);
   border: 1px solid var(--line);
   border-radius: 6px;
-  padding: 0.14rem 0.5rem;
+  padding: 0.12rem 0.45rem;
   cursor: pointer;
   transition: border-color 0.15s, color 0.15s;
 }
@@ -716,23 +893,107 @@ a:hover {
   color: var(--accent-600);
 }
 
-.risk-badge {
-  font-size: 0.56rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  padding: 0.18rem 0.55rem;
-  border-radius: 999px;
-  flex-shrink: 0;
+/* exposure type chips */
+.etypes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin: 0.65rem 0 0.5rem;
 }
 
-.risk-badge.exposed {
+.etype {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  color: var(--ink-2);
+  background: var(--card-2);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 0.14rem 0.45rem;
+  letter-spacing: 0.01em;
+}
+.etype.et-email,
+.etype.et-photo,
+.etype.et-coauthor {
   color: var(--exposed);
   background: var(--exposed-soft);
+  border-color: transparent;
 }
-.risk-badge.noreply {
-  color: var(--safe);
-  background: var(--safe-soft);
+.etype.et-name,
+.etype.et-location,
+.etype.et-company,
+.etype.et-social,
+.etype.et-signoff {
+  color: var(--med);
+  background: var(--med-soft);
+  border-color: transparent;
+}
+
+/* "profile" source hint inside a chip */
+.etype-src {
+  margin-left: 0.35rem;
+  padding-left: 0.35rem;
+  font-size: 0.52rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.75;
+  border-left: 1px solid currentColor;
+}
+
+.person-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  font-size: 0.66rem;
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+}
+
+.dot-sep {
+  opacity: 0.5;
+}
+
+.profile-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px dashed var(--line);
+  font-size: 0.72rem;
+  color: var(--ink-2);
+}
+
+/* ============ HIDDEN HISTORY BANNER ============ */
+
+.hidden-history {
+  background: var(--med-soft);
+  border: 1px solid rgba(201, 138, 46, 0.28);
+  border-left: 3px solid var(--med);
+  border-radius: var(--radius-sm);
+  padding: 0.9rem 1.1rem;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  color: #7a5312;
+  margin-bottom: 1.5rem;
+}
+.hidden-history strong {
+  color: var(--med);
+}
+
+/* ============ DEEP TAG ============ */
+
+.deep-tag {
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--accent-600);
+  background: var(--accent-soft);
+  padding: 0.14rem 0.45rem;
+  border-radius: 999px;
+  margin-left: 0.5rem;
+  vertical-align: middle;
 }
 
 /* ============ NO EMAILS ============ */
