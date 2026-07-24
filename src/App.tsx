@@ -74,6 +74,37 @@ interface CommitData {
   committer: { login: string; avatar_url: string } | null;
 }
 
+type RepoExposure =
+  | "checking"
+  | "exposed"
+  | "safe"
+  | "empty"
+  | "error"
+  | "skipped";
+
+interface RepoItem {
+  name: string;
+  fullName: string;
+  description: string | null;
+  stars: number;
+  language: string | null;
+  pushedAt: string;
+  fork: boolean;
+  archived: boolean;
+  exposure?: RepoExposure;
+}
+
+interface ListState {
+  owner: string;
+  repos: RepoItem[];
+}
+
+type Target =
+  | { kind: "repo"; owner: string; repo: string }
+  | { kind: "owner"; owner: string };
+
+const BULK_CAP = 25;
+
 const RECENT_KEY = "gitbark:recent";
 const EXAMPLES = ["torvalds/linux", "facebook/react", "nodejs/node"];
 
@@ -113,6 +144,41 @@ function parseRepoInput(
   if (parts.length === 2) return { owner: parts[0], repo: parts[1] };
 
   return null;
+}
+
+// Accepts owner/repo (→ scan) or a bare owner (→ list their public repos).
+function parseTarget(input: string): Target | null {
+  const cleaned = input.trim().replace(/\.git$/, "").replace(/\/$/, "");
+  if (!cleaned) return null;
+
+  if (cleaned.includes("github.com")) {
+    const withScheme = cleaned.startsWith("http") ? cleaned : "https://" + cleaned;
+    try {
+      const url = new URL(withScheme);
+      const parts = url.pathname.split("/").filter(Boolean);
+      if (parts.length >= 2) return { kind: "repo", owner: parts[0], repo: parts[1] };
+      if (parts.length === 1) return { kind: "owner", owner: parts[0] };
+    } catch {
+      /* fall through */
+    }
+  }
+
+  const parts = cleaned.split("/").filter(Boolean);
+  if (parts.length === 2) return { kind: "repo", owner: parts[0], repo: parts[1] };
+  if (parts.length === 1 && /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/.test(parts[0]))
+    return { kind: "owner", owner: parts[0] };
+
+  return null;
+}
+
+function formatWhen(iso: string): string {
+  const t = new Date(iso).getTime();
+  if (!t) return "";
+  const days = Math.floor((Date.now() - t) / 86400000);
+  if (days < 1) return "today";
+  if (days < 30) return `${days}d ago`;
+  if (days < 365) return `${Math.floor(days / 30)}mo ago`;
+  return `${Math.floor(days / 365)}y ago`;
 }
 
 function isGitHubNoreply(email: string): boolean {
@@ -204,6 +270,55 @@ async function fetchCommitAtPage(
   const data: CommitData[] = await res.json();
   if (!data.length) throw new Error(`No commit found at page ${page}.`);
   return data[0];
+}
+
+async function fetchRepos(owner: string): Promise<RepoItem[]> {
+  const out: RepoItem[] = [];
+  // Up to 2 pages (200 repos, sorted by most-recently pushed) to bound requests.
+  for (let page = 1; page <= 2; page++) {
+    const res = await fetch(
+      `https://api.github.com/users/${encodeURIComponent(owner)}/repos?per_page=100&sort=pushed&page=${page}`
+    );
+    if (res.status === 404)
+      throw new Error("No such user or organization on GitHub.");
+    if (res.status === 403 || res.status === 429)
+      throw new Error("GitHub API rate limit exceeded (60 req/hr). Try again later.");
+    if (!res.ok) throw new Error(`GitHub API returned ${res.status}.`);
+
+    const data = await res.json();
+    if (!Array.isArray(data) || data.length === 0) break;
+    for (const r of data) {
+      out.push({
+        name: r.name,
+        fullName: r.full_name,
+        description: r.description,
+        stars: r.stargazers_count ?? 0,
+        language: r.language,
+        pushedAt: r.pushed_at,
+        fork: !!r.fork,
+        archived: !!r.archived,
+      });
+    }
+    if (data.length < 100) break;
+  }
+  return out;
+}
+
+// Lightweight per-repo check for bulk mode: is the latest commit's email personal?
+async function quickCheckRepo(owner: string, repo: string): Promise<RepoExposure> {
+  const res = await fetch(
+    `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/commits?per_page=1`
+  );
+  if (res.status === 403 || res.status === 429) throw new Error("ratelimit");
+  if (res.status === 409) return "empty";
+  if (!res.ok) return "error";
+  const data = await res.json();
+  if (!Array.isArray(data) || data.length === 0) return "empty";
+  const c = data[0] as CommitData;
+  const emails = [c.commit.author?.email, c.commit.committer?.email].filter(
+    (e): e is string => !!e && e.includes("@")
+  );
+  return emails.some((e) => !isGitHubNoreply(e)) ? "exposed" : "safe";
 }
 
 async function fetchProfile(login: string): Promise<
@@ -758,10 +873,34 @@ export default function App() {
   const [focusUser, setFocusUser] = useState("");
   const [deepScan, setDeepScan] = useState(false);
 
+  // repo listing (owner mode)
+  const [listing, setListing] = useState<ListState | null>(null);
+  const [listLoading, setListLoading] = useState(false);
+  const [bulkRunning, setBulkRunning] = useState(false);
+
   const scanningRef = useRef(false);
 
-  const mood = moodFor(scanning, error, result);
-  const bark = barkFor(scanning, error, result, status);
+  const busy = scanning || listLoading || bulkRunning;
+  let mood = moodFor(busy, error, result);
+  let bark = barkFor(busy, error, result, status);
+  if (!busy && !error && !result && listing) {
+    const scanned = listing.repos.filter(
+      (r) => r.exposure && r.exposure !== "checking"
+    ).length;
+    const exposedRepos = listing.repos.filter(
+      (r) => r.exposure === "exposed"
+    ).length;
+    if (scanned > 0) {
+      mood = exposedRepos > 0 ? "alert" : "happy";
+      bark =
+        exposedRepos > 0
+          ? `${exposedRepos} of ${scanned} scanned repos expose a personal email.`
+          : `Checked ${scanned} repos — none expose a personal email in their latest commit.`;
+    } else {
+      mood = "idle";
+      bark = `${listing.repos.length} public repo${listing.repos.length === 1 ? "" : "s"} for ${listing.owner}. Scan one, or quick-scan them all.`;
+    }
+  }
 
   function setNode(key: string, state: NodeState) {
     setNodes((prev) => ({ ...prev, [key]: state }));
@@ -792,6 +931,7 @@ export default function App() {
     try {
       const url = new URL(window.location.href);
       url.searchParams.set("repo", repoFullName);
+      url.searchParams.delete("owner");
       window.history.replaceState(null, "", url);
     } catch {
       /* non-fatal */
@@ -851,9 +991,114 @@ export default function App() {
     }
   }
 
+  async function runList(owner: string) {
+    if (scanningRef.current || listLoading || bulkRunning) return;
+    setListLoading(true);
+    setResult(null);
+    setError("");
+    setListing(null);
+    setStatus("Listing public repositories…");
+
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("repo");
+      url.searchParams.set("owner", owner);
+      window.history.replaceState(null, "", url);
+    } catch {
+      /* non-fatal */
+    }
+
+    try {
+      const repos = await fetchRepos(owner);
+      setListing({ owner, repos });
+      setRecent((prev) => {
+        const next = [owner, ...prev.filter((r) => r !== owner)].slice(0, 5);
+        saveRecent(next);
+        return next;
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to list repositories.");
+    } finally {
+      setListLoading(false);
+      setStatus("");
+    }
+  }
+
+  async function runBulk() {
+    if (!listing || bulkRunning || scanningRef.current) return;
+    setBulkRunning(true);
+    setError("");
+
+    const owner = listing.owner;
+    const count = Math.min(listing.repos.length, BULK_CAP);
+    setListing((l) =>
+      l
+        ? {
+            ...l,
+            repos: l.repos.map((r, i) =>
+              i < count ? { ...r, exposure: "checking" } : r
+            ),
+          }
+        : l
+    );
+
+    try {
+      for (let i = 0; i < count; i++) {
+        const repo = listing.repos[i];
+        setStatus(`Quick-scanning ${i + 1}/${count}…`);
+        let outcome: RepoExposure;
+        try {
+          outcome = await quickCheckRepo(owner, repo.name);
+        } catch {
+          // Rate limited — mark the rest skipped and stop.
+          setListing((l) =>
+            l
+              ? {
+                  ...l,
+                  repos: l.repos.map((r, idx) =>
+                    idx >= i && idx < count && r.exposure === "checking"
+                      ? { ...r, exposure: "skipped" }
+                      : r
+                  ),
+                }
+              : l
+          );
+          setError("Hit the GitHub rate limit mid-scan — showing partial results.");
+          break;
+        }
+        setListing((l) =>
+          l
+            ? {
+                ...l,
+                repos: l.repos.map((r, idx) =>
+                  idx === i ? { ...r, exposure: outcome } : r
+                ),
+              }
+            : l
+        );
+      }
+    } finally {
+      setBulkRunning(false);
+      setStatus("");
+    }
+  }
+
+  function submitTarget(raw: string) {
+    setInput(raw);
+    const target = parseTarget(raw);
+    if (!target) {
+      setError("Enter owner/repo to scan, or just owner to list their repos.");
+      setResult(null);
+      setListing(null);
+      return;
+    }
+    if (target.kind === "repo") runScan(`${target.owner}/${target.repo}`);
+    else runList(target.owner);
+  }
+
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    runScan(input);
+    submitTarget(input);
   }
 
   function scanRepo(repoFullName: string) {
@@ -865,6 +1110,7 @@ export default function App() {
     e.preventDefault();
     setInput("");
     setResult(null);
+    setListing(null);
     setError("");
     setStatus("");
     setCopied(false);
@@ -872,6 +1118,7 @@ export default function App() {
     try {
       const url = new URL(window.location.href);
       url.searchParams.delete("repo");
+      url.searchParams.delete("owner");
       window.history.replaceState(null, "", url.pathname + url.search + url.hash);
     } catch {
       /* non-fatal */
@@ -881,10 +1128,14 @@ export default function App() {
   useEffect(() => {
     setRecent(loadRecent());
     const params = new URLSearchParams(window.location.search);
-    const preset = params.get("repo");
-    if (preset) {
-      setInput(preset);
-      runScan(preset);
+    const presetRepo = params.get("repo");
+    const presetOwner = params.get("owner");
+    if (presetRepo) {
+      setInput(presetRepo);
+      runScan(presetRepo);
+    } else if (presetOwner) {
+      setInput(presetOwner);
+      runList(presetOwner);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -983,9 +1234,10 @@ export default function App() {
       <main>
         <p className="description">
           Every git commit embeds its author's identity — email and name — in
-          metadata anyone can read on a public repo. gitbark samples boundary
-          commits (latest, mid, oldest), then surfaces the emails, real names,
-          co-author leaks and public profiles that are exposed.
+          metadata anyone can read on a public repo: just append{" "}
+          <code>.patch</code> to any commit URL. gitbark samples boundary commits
+          (latest, mid, oldest), then surfaces the emails, real names, co-author
+          leaks and public profiles that are exposed.
         </p>
 
         <form className="scan-form" onSubmit={handleSubmit}>
@@ -995,8 +1247,8 @@ export default function App() {
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="owner/repo or github.com/owner/repo"
-              disabled={scanning}
+              placeholder="owner/repo to scan · owner to list repos"
+              disabled={busy}
               autoFocus
               spellCheck={false}
               autoCapitalize="off"
@@ -1004,14 +1256,15 @@ export default function App() {
             <button
               type="submit"
               className="scan-btn"
-              disabled={scanning || !input.trim()}
+              disabled={busy || !input.trim()}
             >
-              {scanning ? "Scanning…" : "Scan"}
+              {scanning ? "Scanning…" : listLoading ? "Listing…" : "Scan"}
             </button>
           </div>
           <div className="form-foot">
             <p className="input-hint">
-              Public repos only · samples 3 boundary commits · 60 req/hr
+              Public repos only · <code>owner/repo</code> scans · <code>owner</code>{" "}
+              lists · 60 req/hr
             </p>
             <button
               type="button"
@@ -1058,13 +1311,13 @@ export default function App() {
           )}
         </form>
 
-        {!scanning && !result && (
+        {!busy && !result && !listing && (
           <div className="chips-block">
             {recent.length > 0 && (
               <div className="chip-group">
                 <span className="chip-label">recent</span>
                 {recent.map((r) => (
-                  <button key={r} className="chip" onClick={() => scanRepo(r)}>
+                  <button key={r} className="chip" onClick={() => submitTarget(r)}>
                     {r}
                   </button>
                 ))}
@@ -1076,7 +1329,7 @@ export default function App() {
                 <button
                   key={r}
                   className="chip chip-example"
-                  onClick={() => scanRepo(r)}
+                  onClick={() => submitTarget(r)}
                 >
                   {r}
                 </button>
@@ -1106,8 +1359,99 @@ export default function App() {
           </div>
         )}
 
+        {!scanning && !listLoading && !result && listing && (
+          <div className="repo-listing">
+            <div className="listing-head">
+              <span className="listing-count">
+                <strong>{listing.repos.length}</strong> public repo
+                {listing.repos.length === 1 ? "" : "s"} ·{" "}
+                <span className="listing-owner">{listing.owner}</span>
+              </span>
+              {listing.repos.length > 0 && (
+                <button
+                  className="copy-btn bulk-btn"
+                  onClick={runBulk}
+                  disabled={bulkRunning}
+                >
+                  {bulkRunning ? "scanning…" : "quick-scan for exposed emails"}
+                </button>
+              )}
+            </div>
+
+            {listing.repos.length > BULK_CAP && (
+              <p className="listing-note">
+                Quick-scan checks the {BULK_CAP} most-recently-pushed repos (rate
+                limit). Scan any repo individually for a full report.
+              </p>
+            )}
+
+            {listing.repos.length === 0 ? (
+              <div className="no-emails">
+                {listing.owner} has no public repositories.
+              </div>
+            ) : (
+              <div className="repo-rows">
+                {listing.repos.map((r) => (
+                  <div className="repo-row" key={r.fullName}>
+                    <div className="repo-row-main">
+                      <div className="repo-row-top">
+                        <button
+                          className="repo-row-name"
+                          onClick={() => scanRepo(r.fullName)}
+                        >
+                          {r.name}
+                        </button>
+                        {r.exposure && r.exposure !== "checking" && (
+                          <span className={`exp-badge exp-${r.exposure}`}>
+                            {r.exposure === "exposed"
+                              ? "exposed"
+                              : r.exposure === "safe"
+                                ? "safe"
+                                : r.exposure === "empty"
+                                  ? "empty"
+                                  : r.exposure === "skipped"
+                                    ? "skipped"
+                                    : "error"}
+                          </span>
+                        )}
+                        {r.exposure === "checking" && (
+                          <span className="exp-badge exp-checking">…</span>
+                        )}
+                        {r.fork && <span className="repo-tag">fork</span>}
+                        {r.archived && <span className="repo-tag">archived</span>}
+                      </div>
+                      {r.description && (
+                        <p className="repo-desc">{r.description}</p>
+                      )}
+                      <div className="repo-row-meta">
+                        {r.language && <span>{r.language}</span>}
+                        {r.stars > 0 && <span>★ {r.stars}</span>}
+                        {r.pushedAt && <span>pushed {formatWhen(r.pushedAt)}</span>}
+                      </div>
+                    </div>
+                    <button
+                      className="rescan-btn repo-scan-btn"
+                      onClick={() => scanRepo(r.fullName)}
+                    >
+                      scan →
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {result && (
           <div className="results">
+            {listing && (
+              <button
+                className="back-link"
+                onClick={() => setResult(null)}
+              >
+                ← {listing.owner}'s repos
+              </button>
+            )}
             <div className="repo-line">
               <span className="repo-name">
                 {result.repoFullName}
