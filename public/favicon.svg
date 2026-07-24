@@ -1,18 +1,19 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <rect width="32" height="32" rx="6" fill="#06070a"/>
-  <!-- Ears -->
-  <path d="M6 16 L10 4.5 L14 14Z" fill="#6e7bf2"/>
-  <path d="M18 14 L22 4.5 L26 16Z" fill="#6e7bf2"/>
-  <!-- Head -->
-  <circle cx="16" cy="20" r="10" fill="#6e7bf2"/>
+  <rect width="32" height="32" rx="8" fill="#f7f5f0"/>
+  <!-- Ears (tan) -->
+  <path d="M7 16 L9.5 5 L15 14 Z" fill="#e6a23c"/>
+  <path d="M25 16 L22.5 5 L17 14 Z" fill="#e6a23c"/>
+  <!-- Head (tan) -->
+  <circle cx="16" cy="18" r="9.5" fill="#e6a23c"/>
+  <!-- Cream face patch (urajiro) -->
+  <ellipse cx="16" cy="19.5" rx="6.6" ry="7" fill="#f7efe0"/>
   <!-- Eyes -->
-  <circle cx="11.5" cy="18" r="2" fill="#06070a"/>
-  <circle cx="20.5" cy="18" r="2" fill="#06070a"/>
-  <!-- Eye shine -->
-  <circle cx="12.3" cy="17.2" r="0.65" fill="rgba(255,255,255,0.3)"/>
-  <circle cx="21.3" cy="17.2" r="0.65" fill="rgba(255,255,255,0.3)"/>
+  <circle cx="12.8" cy="17" r="1.5" fill="#1c1b18"/>
+  <circle cx="19.2" cy="17" r="1.5" fill="#1c1b18"/>
+  <circle cx="13.3" cy="16.5" r="0.5" fill="#ffffff"/>
+  <circle cx="19.7" cy="16.5" r="0.5" fill="#ffffff"/>
   <!-- Nose -->
-  <ellipse cx="16" cy="23" rx="2.5" ry="1.8" fill="#06070a"/>
+  <ellipse cx="16" cy="20" rx="1.7" ry="1.4" fill="#1c1b18"/>
   <!-- Mouth -->
-  <path d="M13.5 25.5 Q16 27.5 18.5 25.5" stroke="#06070a" stroke-width="0.8" fill="none" stroke-linecap="round"/>
+  <path d="M13.6 22.2 Q16 24 18.4 22.2" stroke="#1c1b18" stroke-width="0.9" fill="none" stroke-linecap="round"/>
 </svg>
