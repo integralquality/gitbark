@@ -290,8 +290,8 @@ function Watchdog({ mood }: { mood: Mood }) {
         </g>
       ) : (
         <g fill="var(--ink)">
-          <circle className="wd-eye" cx="38" cy="48" r={mood === "alert" ? 5 : 4} />
-          <circle className="wd-eye" cx="58" cy="48" r={mood === "alert" ? 5 : 4} />
+          <circle className="wd-eye" cx="38" cy="48" r={mood === "alert" ? 3.6 : 4} />
+          <circle className="wd-eye" cx="58" cy="48" r={mood === "alert" ? 3.6 : 4} />
           <circle cx="39.6" cy="46.4" r="1.3" fill="rgba(255,255,255,0.9)" />
           <circle cx="59.6" cy="46.4" r="1.3" fill="rgba(255,255,255,0.9)" />
         </g>
@@ -307,18 +307,30 @@ function Watchdog({ mood }: { mood: Mood }) {
         />
       )}
 
+      {/* angry brows while barking */}
+      {mood === "alert" && (
+        <g stroke="var(--ink)" strokeWidth="2.8" strokeLinecap="round">
+          <path d="M31 42 L43 46" />
+          <path d="M65 42 L53 46" />
+        </g>
+      )}
+
       {/* nose */}
       <ellipse className="wd-nose" cx="48" cy="58" rx="5" ry="4" fill="var(--ink)" />
 
       {/* mouth / bark */}
       {mood === "alert" ? (
-        <g>
+        <g className="wd-bark">
+          {/* open snarling mouth */}
           <path
-            className="wd-bark"
-            d="M40 66 Q48 60 56 66 Q54 77 48 77 Q42 77 40 66 Z"
+            d="M39 64 Q48 61 57 64 Q58 76 48 79 Q38 76 39 64 Z"
             fill="var(--ink)"
           />
-          <path d="M45 70 Q48 74 51 70 Z" fill="var(--exposed)" />
+          {/* teeth */}
+          <path d="M43 64.5 L45.5 68 L48 64.5 Z" fill="#fff" />
+          <path d="M48 64.5 L50.5 68 L53 64.5 Z" fill="#fff" />
+          {/* tongue */}
+          <path d="M44.5 71 Q48 80 51.5 71 Z" fill="var(--exposed)" />
         </g>
       ) : mood === "happy" ? (
         <g>

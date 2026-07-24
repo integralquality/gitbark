@@ -265,27 +265,46 @@ a:hover {
   100% { opacity: 0; transform: translate(8px, -14px); }
 }
 
+/* alert = two quick barks, then a ~5s pause, on loop (6s cycle) */
 .mood-alert {
-  animation: shake 0.5s ease-in-out infinite;
   transform-origin: 48px 82px;
+  animation: barkShake 6s ease-in-out infinite;
 }
-@keyframes shake {
-  0%, 100% { transform: rotate(-3deg); }
-  50% { transform: rotate(3deg); }
+@keyframes barkShake {
+  0%   { transform: rotate(-2.5deg); }
+  4%   { transform: rotate(2.5deg); }
+  8%   { transform: rotate(-2.5deg); }
+  12%  { transform: rotate(2.5deg); }
+  16%, 100% { transform: rotate(0deg); }
 }
+
+.mood-alert .wd-bark {
+  transform-origin: 48px 64px;
+  animation: bark 6s ease-in-out infinite;
+}
+@keyframes bark {
+  0%   { transform: scaleY(0.35); }
+  4%   { transform: scaleY(1); }
+  9%   { transform: scaleY(0.35); }
+  13%  { transform: scaleY(1); }
+  17%, 100% { transform: scaleY(0.35); }
+}
+
+/* ears stay perked throughout the alert */
 .mood-alert .wd-ears {
-  animation: perk 0.5s ease-in-out infinite alternate;
+  transform: translateY(-1.5px) scaleY(1.05);
 }
-@keyframes perk {
-  from { transform: translateY(0); }
-  to { transform: translateY(-2px) scaleY(1.06); }
-}
+
 .wd-sparks {
-  animation: flash 0.4s steps(2) infinite;
+  animation: barkSparks 6s ease-in-out infinite;
 }
-@keyframes flash {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.2; }
+@keyframes barkSparks {
+  0%   { opacity: 0.25; }
+  5%   { opacity: 1; }
+  10%  { opacity: 0.25; }
+  15%  { opacity: 1; }
+  17%  { opacity: 0; }
+  100% { opacity: 0; }
 }
 
 .mood-happy {
