@@ -11,7 +11,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0 # full history — shallow clones hide old leaks
-      - uses: ./ # this repo's action; use 792401/gitbark@v1 elsewhere
+      - uses: ./ # this repo's action; use integralquality/gitbark@v1 elsewhere
         with:
           # This repo scans itself for demonstration; report only, never fail.
           fail-on: never

@@ -22,7 +22,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: 792401/gitbark@v1
+      - uses: integralquality/gitbark@v1
         with:
           fail-on: high
 ```
@@ -34,7 +34,7 @@ Findings show up as inline annotations on the PR and in the job summary; a `high
 Full-history scans flag pre-existing leaks too. To gate only what a PR *adds*, scan the range against the base branch:
 
 ```yaml
-      - uses: 792401/gitbark@v1
+      - uses: integralquality/gitbark@v1
         with:
           since: origin/${{ github.base_ref }}
           fail-on: high
@@ -45,7 +45,7 @@ Full-history scans flag pre-existing leaks too. To gate only what a PR *adds*, s
 Ignore addresses you accept (bots, noreply, your own domain):
 
 ```yaml
-      - uses: 792401/gitbark@v1
+      - uses: integralquality/gitbark@v1
         with:
           allow: |
             *@users.noreply.github.com
@@ -129,6 +129,6 @@ gitbark also flags **hidden history**: repos where recent commits switched to a 
 npm test   # runs the unit tests (node --test)
 ```
 
-The browser UI that this project started as lives on the [`frontend`](https://github.com/792401/gitbark/tree/frontend) branch.
+The browser UI that this project started as lives on the [`frontend`](https://github.com/integralquality/gitbark/tree/frontend) branch.
 
 MIT licensed.

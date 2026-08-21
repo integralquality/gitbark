@@ -49,7 +49,7 @@ export function formatReport(result, meta = {}) {
     );
   }
   L.push("");
-  L.push("Emails are masked. See https://github.com/792401/gitbark to fix exposure.");
+  L.push("Emails are masked. See https://github.com/integralquality/gitbark to fix exposure.");
   return L.join("\n");
 }
 
