@@ -1,6 +1,6 @@
 # gitbark
 
-A tool for finding the personal data that public GitHub repos quietly expose. Point it at any public repo and it surfaces the emails, real names, co-author leaks, and public profile info embedded in the commit history.
+**The repo PII watchdog.** Point it at any public GitHub repo and it sniffs out the personal data — emails, real names, co-author leaks, public profiles — that the commit history quietly exposes to anyone.
 
 Every git commit embeds its author's identity (name + email) in metadata that anyone can read on a public repo — just append `.patch` to any commit URL to see it. Most people never realize their personal email is sitting in their public history. gitbark surfaces exactly what's exposed and how to lock it down.
 
