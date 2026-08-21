@@ -5,7 +5,19 @@ on:
   pull_request:
 
 jobs:
-  scan:
+  # Unit tests for the analysis core.
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node --test
+
+  # Dogfood: run the action on this repo. Report-only, because this repo's own
+  # commit trailers would otherwise flag high and fail the build.
+  self-scan:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -13,5 +25,47 @@ jobs:
           fetch-depth: 0 # full history — shallow clones hide old leaks
       - uses: ./ # this repo's action; use integralquality/gitbark@v1 elsewhere
         with:
-          # This repo scans itself for demonstration; report only, never fail.
           fail-on: never
+
+  # Prove the action actually fails on a leak and passes on a clean repo.
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: exposed repo should fail (exit 1)
+        run: |
+          set -e
+          tmp="$(mktemp -d)"
+          git -C "$tmp" init -q
+          git -C "$tmp" config user.name "Test User"
+          git -C "$tmp" config user.email "leaked@personal.dev"
+          git -C "$tmp" commit -q --allow-empty -m "leak"
+          if node "$GITHUB_WORKSPACE/bin/gitbark.js" --path "$tmp" --fail-on high; then
+            echo "::error::expected gitbark to fail on an exposed email"
+            exit 1
+          fi
+          echo "✓ correctly failed on an exposed email"
+
+      - name: clean repo should pass (exit 0)
+        run: |
+          set -e
+          tmp="$(mktemp -d)"
+          git -C "$tmp" init -q
+          git -C "$tmp" config user.name "octocat"
+          git -C "$tmp" config user.email "1+octocat@users.noreply.github.com"
+          git -C "$tmp" commit -q --allow-empty -m "clean"
+          node "$GITHUB_WORKSPACE/bin/gitbark.js" --path "$tmp" --fail-on high
+          echo "✓ correctly passed on a noreply-only repo"
+
+      - name: allowlist should suppress a leak
+        run: |
+          set -e
+          tmp="$(mktemp -d)"
+          git -C "$tmp" init -q
+          git -C "$tmp" config user.name "Test User"
+          git -C "$tmp" config user.email "dev@allowed.example"
+          git -C "$tmp" commit -q --allow-empty -m "allowed"
+          node "$GITHUB_WORKSPACE/bin/gitbark.js" --path "$tmp" --fail-on high \
+            --allow "*@allowed.example"
+          echo "✓ allowlist suppressed the finding"
