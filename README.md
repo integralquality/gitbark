@@ -1,50 +1,134 @@
 # gitbark
 
-**The repo PII watchdog.** Point it at any public GitHub repo and it sniffs out the personal data — emails, real names, co-author leaks, public profiles — that the commit history quietly exposes to anyone.
+Scan a git repository's **commit history** for exposed personal data — personal emails, real names, and identities leaked through `Co-authored-by:` / `Signed-off-by:` trailers — and fail your CI when it finds them.
 
-Every git commit embeds its author's identity (name + email) in metadata that anyone can read on a public repo — just append `.patch` to any commit URL to see it. Most people never realize their personal email is sitting in their public history. gitbark surfaces exactly what's exposed and how to lock it down.
+Every git commit embeds its author's identity (name + email) in metadata that anyone can read on a public repo — just append `.patch` to any commit URL to see it. Most people never realize their personal email is sitting in their public history. gitbark catches that before it ships.
 
-## What it checks
+It reads commit **metadata only** (never file contents) straight from local git, so it's fast, needs no API token, and has no rate limit. Zero runtime dependencies.
 
-- **Emails** — personal addresses committed to history (vs. GitHub `noreply` addresses, which are safe).
-- **Real names** — full names attached to commits.
-- **Co-author & sign-off leaks** — identities hidden in `Co-authored-by:` and `Signed-off-by:` commit trailers.
-- **Hidden history** — flags repos where recent commits switched to a private noreply address but older commits still leak a real email (privacy enabled without rewriting history).
-- **Public profile PII** *(deep scan)* — location, company, and social handles pulled from contributors' GitHub profiles, plus a public **Gravatar** photo linked to a leaked email.
+## Use it in GitHub Actions
 
-Findings are grouped per person into identity cards and ranked **high / medium / safe**, so you see who's most exposed at a glance.
+Add a workflow. The one thing that matters: **check out full history** with `fetch-depth: 0`, or a shallow clone hides the old commits you're trying to catch.
 
-## How it works
+```yaml
+# .github/workflows/gitbark.yml
+name: gitbark
+on: [pull_request]
 
-gitbark reads commit **metadata only** — it never fetches diffs or file contents. To stay well within GitHub's unauthenticated rate limit, it **boundary-samples** each repo, pulling the latest, middle, and oldest commits rather than the whole history. That's enough to catch identity leaks across a project's lifetime in just a few requests.
+jobs:
+  pii:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: 792401/gitbark@v1
+        with:
+          fail-on: high
+```
 
-Everything runs client-side in the browser against the public GitHub REST API. Nothing is sent to a server or stored; the exportable report masks emails by default.
+Findings show up as inline annotations on the PR and in the job summary; a `high` finding fails the check.
 
-## Features
+### Scan only a PR's new commits
 
-- **Scan a repo** — enter `owner/repo` or a GitHub URL.
-- **List an owner's repos** — enter just an `owner` (user or org) to browse their public repos, then **quick-scan** them all for exposed emails at once.
-- **Highlight me** — flag your own identity in the results by username, email, or name.
-- **Deep scan** — opt in to public-profile + Gravatar lookups (uses a few extra requests).
-- **Shareable links** — scans are captured in the URL (`?repo=` / `?owner=`) and recent scans are remembered locally.
-- **Exportable report** — copy or download a plain-text summary (emails masked).
-- **Fix guide** — step-by-step instructions to enable email privacy and clean up leaked history.
+Full-history scans flag pre-existing leaks too. To gate only what a PR *adds*, scan the range against the base branch:
 
-## Tech
+```yaml
+      - uses: 792401/gitbark@v1
+        with:
+          since: origin/${{ github.base_ref }}
+          fail-on: high
+```
 
-React 19 + TypeScript, built with Vite. No backend, no dependencies beyond React — a single-page app talking directly to the GitHub API.
+### Allowlisting
+
+Ignore addresses you accept (bots, noreply, your own domain):
+
+```yaml
+      - uses: 792401/gitbark@v1
+        with:
+          allow: |
+            *@users.noreply.github.com
+            ci@yourcompany.com
+            *@yourcompany.com
+```
+
+### Action inputs
+
+| Input | Default | Description |
+|---|---|---|
+| `path` | `.` | Directory to scan. |
+| `fail-on` | `high` | Severity that fails the job: `high`, `medium`, or `never`. |
+| `since` | `""` | Only scan commits after this ref (e.g. `origin/main`). Empty = full history. |
+| `allow` | `""` | Emails or `*@domain` patterns to ignore, one per line or comma-separated. |
+
+## Use it as a CLI
+
+No install needed:
+
+```bash
+npx gitbark                              # scan the current repo's full history
+npx gitbark --since origin/main          # only new commits vs. main
+npx gitbark --fail-on medium             # also fail on real-name exposure
+npx gitbark --allow "*@users.noreply.github.com" --format json
+```
+
+Or install it:
+
+```bash
+npm install -g gitbark
+gitbark --help
+```
+
+### Exit codes
+
+| Code | Meaning |
+|---|---|
+| `0` | No exposure at or above the fail threshold. |
+| `1` | Exposure found — fails the build. |
+| `2` | Usage error / not a git repo. |
+
+## Use it as a library
+
+The analysis core is pure and dependency-free:
+
+```js
+import { analyzeCommits } from "gitbark";
+
+const result = analyzeCommits(commits); // commits: [{ sha, authorName, authorEmail, committerName, committerEmail, message }]
+// → { totalCommits, identities, highCount, mediumCount, safeCount, hiddenHistory }
+```
+
+## What counts as exposure
+
+| Severity | What it means |
+|---|---|
+| 🔴 **high** | A personal email is committed to history (author, committer, or a trailer). |
+| 🟡 **medium** | A real name is exposed, but no personal email. |
+| 🟢 **safe** | Only GitHub `noreply` addresses — nothing personal. |
+
+gitbark also flags **hidden history**: repos where recent commits switched to a private noreply address but older commits still leak a real email (privacy was enabled without rewriting history).
+
+## How to fix exposure
+
+1. GitHub → **Settings → Emails** → enable **"Keep my email addresses private"** and **"Block command line pushes that expose my email"**.
+2. Point local git at your noreply address:
+   ```bash
+   git config --global user.email "ID+USERNAME@users.noreply.github.com"
+   ```
+3. Old commits still contain the exposed data — rewrite history with [`git filter-repo`](https://github.com/newren/git-filter-repo) or [BFG Repo-Cleaner](https://rtyley.github.io/bfg-repo-cleaner/) if needed.
+
+## Limitations
+
+- Reads commit **metadata**, not file contents — secrets or PII committed *inside* files aren't detected.
+- Name/email heuristics are best-effort; use `allow` to quiet known-good addresses.
 
 ## Development
 
 ```bash
-npm install
-npm run dev      # start the dev server
-npm run build    # type-check and build for production
-npm run preview  # preview the production build
+npm test   # runs the unit tests (node --test)
 ```
 
-## Limitations
+The browser UI that this project started as lives on the [`frontend`](https://github.com/792401/gitbark/tree/frontend) branch.
 
-- **Public repos only**, and unauthenticated GitHub access is capped at **60 requests/hour** per IP.
-- Boundary sampling can miss leaks in the middle of a large history — it's a fast triage, not an exhaustive audit.
-- gitbark reads commit metadata, not file contents, so secrets or PII committed *inside* files aren't detected.
+MIT licensed.
